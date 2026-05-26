@@ -1,0 +1,6 @@
+,Farm,Trader,Mandi,Retail,Transport
+Farm,0,1,1,1,1
+Trader,0,0,0,1,1
+Mandi,0,1,0,1,1
+Retail,0,0,0,0,0
+Transport,0,0,0,1,0

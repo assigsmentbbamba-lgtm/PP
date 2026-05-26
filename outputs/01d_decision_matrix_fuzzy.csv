@@ -1,0 +1,16 @@
+Stage,Criterion,l,m,u
+Farm,Cost,3.022,3.7534,4.4848
+Farm,Time,3.0647,3.7755,4.4863
+Farm,Quality,3.0102,3.7719,4.5336
+Trader,Cost,2.9164,3.6478,4.3793
+Trader,Time,2.9659,3.6532,4.3406
+Trader,Quality,2.9015,3.652,4.4025
+Mandi,Cost,2.9968,3.7251,4.4535
+Mandi,Time,3.0716,3.7734,4.4752
+Mandi,Quality,2.9944,3.7335,4.4726
+Retail,Cost,2.8232,3.5338,4.2445
+Retail,Time,2.8215,3.5438,4.2662
+Retail,Quality,3.0239,3.7394,4.4548
+Transport,Cost,2.8926,3.6294,4.3661
+Transport,Time,3.1078,3.8525,4.5972
+Transport,Quality,2.8944,3.6274,4.3603
