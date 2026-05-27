@@ -7,23 +7,26 @@ Formatting rules (as requested):
   - Sub-headings:    Times New Roman, 12 pt, BOLD + ITALIC
   - Section headings: Times New Roman, 14 pt, BOLD
   - Tables in TNR 11-12 pt
+  - 10 figures embedded with captions at the appropriate sections
 """
 
+import os
 from docx import Document
-from docx.shared import Pt, Cm, Inches, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Pt, Cm, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_ALIGN_VERTICAL
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
 FONT = "Times New Roman"
+FIG_DIR = "figures"
+
 
 def set_run(run, size=12, bold=False, italic=False):
     run.font.name = FONT
     run.font.size = Pt(size)
     run.bold = bold
     run.italic = italic
-    # also set the East-Asian font so Word doesn't substitute
     rpr = run._element.get_or_add_rPr()
     rfonts = rpr.find(qn('w:rFonts'))
     if rfonts is None:
@@ -33,7 +36,9 @@ def set_run(run, size=12, bold=False, italic=False):
     rfonts.set(qn('w:hAnsi'), FONT)
     rfonts.set(qn('w:cs'), FONT)
 
-def add_heading(doc, text, size=14, align=WD_ALIGN_PARAGRAPH.LEFT, space_before=12, space_after=6):
+
+def add_heading(doc, text, size=14, align=WD_ALIGN_PARAGRAPH.LEFT,
+                space_before=12, space_after=6):
     p = doc.add_paragraph()
     p.alignment = align
     p.paragraph_format.space_before = Pt(space_before)
@@ -42,6 +47,7 @@ def add_heading(doc, text, size=14, align=WD_ALIGN_PARAGRAPH.LEFT, space_before=
     r = p.add_run(text)
     set_run(r, size=size, bold=True)
     return p
+
 
 def add_subheading(doc, text):
     """Bold + italic, 12 pt"""
@@ -52,6 +58,7 @@ def add_subheading(doc, text):
     r = p.add_run(text)
     set_run(r, size=12, bold=True, italic=True)
     return p
+
 
 def add_body(doc, text, justify=True, indent_first=True):
     p = doc.add_paragraph()
@@ -64,34 +71,22 @@ def add_body(doc, text, justify=True, indent_first=True):
     set_run(r, size=12)
     return p
 
+
 def add_bullet(doc, text, level=0):
     p = doc.add_paragraph(style='List Bullet')
-    p.paragraph_format.left_indent = Cm(1.0 + 0.6*level)
-    p.paragraph_format.space_after = Pt(2)
-    p.paragraph_format.line_spacing = 1.15
-    r = p.runs[0] if p.runs else p.add_run("")
-    if not p.runs:
-        r = p.add_run(text)
-    else:
-        # bullet style adds an empty run sometimes, just add new
-        r = p.add_run(text)
-    set_run(r, size=12)
-    return p
-
-def add_numbered(doc, text):
-    p = doc.add_paragraph(style='List Number')
+    p.paragraph_format.left_indent = Cm(1.0 + 0.6 * level)
     p.paragraph_format.space_after = Pt(2)
     p.paragraph_format.line_spacing = 1.15
     r = p.add_run(text)
     set_run(r, size=12)
     return p
 
+
 def add_table(doc, header, rows, col_widths=None):
     n_cols = len(header)
     table = doc.add_table(rows=1, cols=n_cols)
     table.style = 'Light Grid Accent 1'
     table.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    # header
     hdr = table.rows[0].cells
     for i, txt in enumerate(header):
         hdr[i].text = ""
@@ -100,7 +95,6 @@ def add_table(doc, header, rows, col_widths=None):
         r = p.add_run(txt)
         set_run(r, size=11, bold=True)
         hdr[i].vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-    # rows
     for row in rows:
         cells = table.add_row().cells
         for i, txt in enumerate(row):
@@ -116,6 +110,7 @@ def add_table(doc, header, rows, col_widths=None):
                 row.cells[i].width = w
     return table
 
+
 def add_caption(doc, text):
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -125,22 +120,41 @@ def add_caption(doc, text):
     set_run(r, size=11, bold=True, italic=True)
     return p
 
-# ---------- DOCUMENT ----------
-doc = Document()
 
-# default style
+def add_figure(doc, filename, caption_text, width_inches=6.2):
+    """Insert a figure (PNG) centred + bold-italic caption under it."""
+    path = os.path.join(FIG_DIR, filename)
+    if not os.path.exists(path):
+        # graceful fallback – just write the caption with a note
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(f"[Figure file missing: {filename}]")
+        set_run(r, size=11, italic=True)
+    else:
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_before = Pt(8)
+        p.paragraph_format.space_after = Pt(2)
+        run = p.add_run()
+        run.add_picture(path, width=Inches(width_inches))
+    add_caption(doc, caption_text)
+
+
+# =============================================================
+# DOCUMENT
+# =============================================================
+doc = Document()
 style = doc.styles['Normal']
 style.font.name = FONT
 style.font.size = Pt(12)
 
-# margins
 for s in doc.sections:
     s.left_margin = Cm(2.54)
     s.right_margin = Cm(2.54)
     s.top_margin = Cm(2.54)
     s.bottom_margin = Cm(2.54)
 
-# ============== TITLE PAGE-LIKE HEADING ==============
+# ============== TITLE ==============
 title_p = doc.add_paragraph()
 title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 title_p.paragraph_format.space_after = Pt(6)
@@ -170,6 +184,11 @@ add_body(doc,
     "respects both the lived experience of the stakeholders and the analytical "
     "rigour expected of academic research."
 )
+# Figure 3.1 — Overall research process flowchart
+add_figure(doc, "fig_3_1_research_process.png",
+           "Figure 3.1  Overall research process flowchart "
+           "(problem identification through to optimisation framework)",
+           width_inches=5.6)
 
 # ============== 3.2 RESEARCH DESIGN ==============
 add_heading(doc, "3.2  Research Design")
@@ -188,6 +207,12 @@ add_body(doc,
     "transporters."
 )
 
+# Figure 3.3 — Supply chain map (placed here to anchor the description)
+add_figure(doc, "fig_3_3_supply_chain.png",
+           "Figure 3.2  Malta (Citrus sinensis) supply-chain stakeholder map "
+           "showing the five strata in which data was collected",
+           width_inches=6.4)
+
 add_subheading(doc, "3.2.1  Nature of the study")
 add_body(doc,
     "The study is descriptive in the sense that it portrays the structure of the "
@@ -202,7 +227,7 @@ add_body(doc,
     "and supply chain management, APEDA bulletins and similar sources."
 )
 
-# ============== 3.3 THEORETICAL FOUNDATION - RBV ==============
+# ============== 3.3 RBV ==============
 add_heading(doc, "3.3  Theoretical Foundation: The Resource-Based View (RBV)")
 add_body(doc,
     "The conceptual lens adopted for the present work is the Resource-Based View "
@@ -233,7 +258,13 @@ add_body(doc,
     "shared or substituted."
 )
 
-# ============== 3.4 DATA COLLECTION PHASES ==============
+# Figure 3.4 — RBV framework
+add_figure(doc, "fig_3_4_rbv_framework.png",
+           "Figure 3.3  Resource-Based View (RBV) framework mapped to the "
+           "cost / time / quality dimensions of the Malta supply chain",
+           width_inches=6.4)
+
+# ============== 3.4 PHASES ==============
 add_heading(doc, "3.4  Phases of Data Collection")
 add_body(doc,
     "The fieldwork was organised in three phases between September 2024 and "
@@ -242,7 +273,6 @@ add_body(doc,
     "beginning. The three phases are described below."
 )
 
-# Table of phases
 phase_rows = [
     ["Phase I", "Sept 2024 - Feb 2025",
      "Exploratory & Pilot Phase",
@@ -265,6 +295,12 @@ add_table(doc,
 )
 add_caption(doc, "Table 3.1  Three-phase plan of data collection (Sept 2024 - Dec 2025)")
 
+# Figure 3.2 — Three-phase timeline
+add_figure(doc, "fig_3_2_phases_timeline.png",
+           "Figure 3.4  Three-phase data-collection timeline "
+           "(September 2024 – December 2025)",
+           width_inches=6.4)
+
 add_body(doc,
     "Spreading the work across three phases also helped in handling the strong "
     "seasonality of Malta. The fruit broadly hits the mandis between November and "
@@ -274,7 +310,7 @@ add_body(doc,
     "after a complete production cycle had passed."
 )
 
-# ============== 3.5 IDENTIFICATION OF FACTORS ==============
+# ============== 3.5 IDENTIFICATION ==============
 add_heading(doc, "3.5  Identification and Refinement of Factors")
 add_body(doc,
     "A central methodological task of the study was to arrive at a defensible "
@@ -302,12 +338,18 @@ for s in [
 ]:
     add_bullet(doc, s)
 
+# Figure 3.5 — Sources to 144 factors
+add_figure(doc, "fig_3_5_factor_sources.png",
+           "Figure 3.5  Five sources converging into the initial pool of 144 factors",
+           width_inches=6.4)
+
 add_subheading(doc, "3.5.2  Categorisation of the initial 144 factors")
 add_body(doc,
     "The 144 factors were first organised on two intersecting axes: (a) the stage "
     "of the supply chain (Farm, Local Trader/Commission Agent, Mandi/Wholesale, "
     "Retail, Transportation) and (b) the dimension of inefficiency (Cost, Time, "
-    "Quality). The stage-wise distribution of the initial pool is given in Table 3.2."
+    "Quality). The stage-wise distribution of the initial pool is given in Table 3.2 "
+    "and visualised in Figure 3.6."
 )
 
 stage_rows = [
@@ -326,6 +368,11 @@ add_table(doc,
 )
 add_caption(doc, "Table 3.2  Stage-wise distribution of factors (144 → 82)")
 
+# Figure 3.7 — stage x dimension distribution
+add_figure(doc, "fig_3_7_stage_dim_dist.png",
+           "Figure 3.6  Stage × Dimension distribution of factors: initial 144 vs final 82",
+           width_inches=6.4)
+
 # ============== 3.6 LIST OF 144 FACTORS ==============
 add_heading(doc, "3.6  Initial Pool of 144 Factors")
 add_body(doc,
@@ -336,7 +383,7 @@ add_body(doc,
     "(E). The reasons for elimination are summarised in Section 3.7."
 )
 
-# helper to render long factor lists
+
 def factor_block(title, items):
     add_subheading(doc, title)
     for idx, (txt, status) in enumerate(items, 1):
@@ -349,6 +396,7 @@ def factor_block(title, items):
         set_run(r, size=12)
         r2 = p.add_run(f"[{status}]")
         set_run(r2, size=12, bold=True, italic=True)
+
 
 # ---- FARM (32) ----
 farm_cost = [
@@ -390,7 +438,6 @@ farm_quality = [
     ("Adequacy of natural shade at on-farm storage", "E"),
 ]
 
-# ---- TRADER (29) ----
 trader_cost = [
     ("Purchase price paid to farmers", "R"),
     ("Transportation to trader's premises", "R"),
@@ -427,7 +474,6 @@ trader_quality = [
     ("Inconsistency in grading judgement across staff", "E"),
 ]
 
-# ---- MANDI (28) ----
 mandi_cost = [
     ("Mandi entry fee / gate fee", "R"),
     ("Weighing charges at mandi platform", "R"),
@@ -463,7 +509,6 @@ mandi_quality = [
     ("Damage caused by stacking pressure during peak inflow", "E"),
 ]
 
-# ---- RETAIL (25) ----
 retail_cost = [
     ("Purchase cost from mandi / wholesaler", "R"),
     ("Transportation cost from mandi to retail outlet", "R"),
@@ -496,7 +541,6 @@ retail_quality = [
     ("Quality damage due to repeated handling by customers", "E"),
 ]
 
-# ---- TRANSPORT (30) ----
 trans_cost = [
     ("Vehicle hire / ownership cost", "R"),
     ("Fuel and routine maintenance cost", "R"),
@@ -545,14 +589,19 @@ add_body(doc,
     "the refinement process described in Section 3.7."
 )
 
-# ============== 3.7 REFINEMENT FROM 144 TO 82 ==============
+# ============== 3.7 REFINEMENT 144 -> 82 ==============
 add_heading(doc, "3.7  Refinement Process: From 144 to 82 Factors")
 add_body(doc,
     "The reduction of factors from 144 to 82 was not a single-step exercise. Three "
     "checks were carried out, in sequence, and a factor had to clear all three "
-    "checks to enter the final instrument. The flow is summarised in the diagram "
-    "below."
+    "checks to enter the final instrument. The flow is summarised in the funnel "
+    "diagram below."
 )
+
+# Figure 3.6 — refinement funnel (144 -> 116 -> 94 -> 82)
+add_figure(doc, "fig_3_6_refinement_funnel.png",
+           "Figure 3.7  Three-step refinement funnel (144 → 116 → 94 → 82 factors)",
+           width_inches=6.4)
 
 add_subheading(doc, "3.7.1  Step 1 - Expert content validity check")
 add_body(doc,
@@ -587,7 +636,7 @@ add_body(doc,
     "merged with a parent item or dropped. Twelve more items were removed at "
     "this stage. The instrument finally stabilised at 82 factors. "
     "Post-refinement reliability statistics from the main survey (n = 1,300) "
-    "are reported in Table 3.3."
+    "are reported in Table 3.3 and visualised in Figure 3.8."
 )
 
 reliability_rows = [
@@ -615,6 +664,11 @@ add_table(doc,
 )
 add_caption(doc, "Table 3.3  Reliability statistics for the 82-factor instrument (n = 1,300)")
 
+# Figure 3.9 — Cronbach alpha bar chart
+add_figure(doc, "fig_3_9_cronbach.png",
+           "Figure 3.8  Reliability of the 15 sub-scales – Cronbach's α (n = 1,300)",
+           width_inches=6.0)
+
 add_body(doc,
     "All sub-scales report Cronbach's alpha well above the conventional threshold "
     "of 0.70, and the average inter-item correlation lies between 0.52 and 0.66, "
@@ -623,7 +677,7 @@ add_body(doc,
     "redundant."
 )
 
-# ============== 3.8 LIST OF FINAL 82 FACTORS ==============
+# ============== 3.8 LIST OF 82 FACTORS ==============
 add_heading(doc, "3.8  Final List of 82 Validated Factors")
 add_body(doc,
     "The final 82 factors retained for analysis are listed below, organised "
@@ -756,7 +810,7 @@ for sub_title, items in final_factors:
         r = p.add_run(it)
         set_run(r, size=12)
 
-# ============== 3.9 SAMPLING DESIGN ==============
+# ============== 3.9 SAMPLING ==============
 add_heading(doc, "3.9  Sampling Design and Sample-size Justification")
 add_body(doc,
     "The sampling strategy used in this study is stratified random sampling. The "
@@ -770,6 +824,11 @@ add_body(doc,
     "stratified design captures every link without under-representing the smaller "
     "but functionally critical groups."
 )
+
+# Figure 3.8 — Sampling tree
+add_figure(doc, "fig_3_8_sampling_tree.png",
+           "Figure 3.9  Stratified random sampling design (n = 1,300)",
+           width_inches=6.4)
 
 add_subheading(doc, "3.9.1  Why a sample size of more than 1,000")
 add_body(doc,
@@ -845,7 +904,6 @@ add_body(doc,
     "the Garhwal region."
 )
 
-# Sample distribution
 sample_rows = [
     ("Farmers / Growers", 540),
     ("Local Traders / Commission Agents", 220),
@@ -861,7 +919,7 @@ add_table(doc,
 )
 add_caption(doc, "Table 3.4  Achieved sample by stakeholder group (n = 1,300)")
 
-# ============== 3.10 DATA-COLLECTION INSTRUMENTS ==============
+# ============== 3.10 INSTRUMENTS ==============
 add_heading(doc, "3.10  Data-Collection Instruments")
 add_body(doc,
     "A structured five-point Likert questionnaire (1 = Strongly Disagree to "
@@ -910,6 +968,12 @@ add_body(doc,
     "represented by Mangla et al. (2017) and Luthra et al. (2016)."
 )
 
+# Figure 3.10 — Two-stage analytical pipeline
+add_figure(doc, "fig_3_10_analytical_pipeline.png",
+           "Figure 3.10  Two-stage MCDM analytical pipeline – Fuzzy AHP "
+           "weights feeding into ELECTRE outranking",
+           width_inches=6.4)
+
 # ============== 3.12 AUTHENTICATION & GENERALISATION ==============
 add_heading(doc, "3.12  Authentication and Generalisation of Results")
 add_body(doc,
@@ -927,23 +991,26 @@ add_body(doc,
     "region without losing analytical sharpness."
 )
 
-# ============== 3.13 PRESENTATION FRAMEWORK ==============
+# ============== 3.13 PRESENTATION ==============
 add_heading(doc, "3.13  Presentation and Documentation of the Research Design")
 add_body(doc,
     "To improve the readability and visual quality of the chapter, the research "
-    "design has been documented through the following supporting elements:"
+    "design has been documented through the following supporting elements, which "
+    "appear in their respective sections of this chapter:"
 )
 for s in [
-    "Flow diagrams of the overall research process (Phase I to Phase III).",
-    "A methodology framework diagram linking Resource-Based View constructs to "
-    "the cost-time-quality dimensions of the Malta chain.",
-    "A factor screening and selection process chart (144 → 116 → 94 → 82).",
-    "Tables for factor categorisation by stage and by dimension.",
-    "Stakeholder classification table showing strata and achieved sample.",
-    "Figures illustrating the three phases of data collection and the analytical "
-    "pipeline (Fuzzy AHP weights followed by ELECTRE ranking).",
-    "Comparative graphs of Fuzzy AHP weights and ELECTRE rankings for the final "
-    "82 factors.",
+    "Figure 3.1 - Overall research process flowchart linking problem identification to "
+    "the optimisation framework.",
+    "Figure 3.2 - Malta supply-chain stakeholder map with achieved sample sizes.",
+    "Figure 3.3 - RBV framework diagram mapping resources and capabilities to "
+    "the cost / time / quality dimensions of the chain.",
+    "Figure 3.4 - Three-phase Gantt-style timeline of fieldwork.",
+    "Figure 3.5 - Source-convergence diagram for the initial 144-factor pool.",
+    "Figure 3.6 - Stage × dimension factor distribution (initial vs final).",
+    "Figure 3.7 - Three-step refinement funnel (144 → 116 → 94 → 82).",
+    "Figure 3.8 - Cronbach's α profile across the 15 sub-scales.",
+    "Figure 3.9 - Stratified sampling tree showing strata and districts.",
+    "Figure 3.10 - Two-stage MCDM analytical pipeline (Fuzzy AHP + ELECTRE).",
 ]:
     add_bullet(doc, s)
 
